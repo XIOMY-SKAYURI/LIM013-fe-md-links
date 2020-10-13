@@ -1,0 +1,1 @@
+lechuga,zanahoria,cebolla
