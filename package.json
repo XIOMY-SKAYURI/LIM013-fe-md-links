@@ -22,6 +22,9 @@
     "bugs": {
         "url": "https://github.com/XIOMY-SKAYURI/LIM013-fe-md-links/issues"
     },
+    "bin": {
+        "md-links": "./cli.js"
+    },
     "homepage": "https://github.com/XIOMY-SKAYURI/LIM013-fe-md-links#readme",
     "dependencies": {
         "@octokit/auth-basic": "^1.4.6",
@@ -40,6 +43,7 @@
         "lodash": "^4.17.20",
         "markdown-it": "^11.0.1",
         "minimist": "^1.2.5",
+        "node-fetch": "^2.6.1",
         "simple-git": "^2.21.0",
         "slash": "^3.0.0",
         "touch": "^3.1.0",
@@ -48,8 +52,5 @@
     "devDependencies": {
         "@laboratoria/curriculum-parser": "github:Laboratoria/course-parser",
         "jest": "^26.5.0"
-    },
-    "bin": {
-        "md-links": "index.js"
     }
 }

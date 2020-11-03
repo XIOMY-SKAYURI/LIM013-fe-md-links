@@ -1,10 +1,20 @@
-#!/usr/bin/env node
-
 const chalk = require('chalk');
 const clear = require('clear');
 const figlet = require('figlet');
-
+const colors = require('colors');
 const files = require('./lib/files');
+colors.setTheme({
+    silly: 'rainbow',
+    input: 'grey',
+    verbose: 'cyan',
+    prompt: 'grey',
+    info: 'green',
+    data: 'grey',
+    help: 'cyan',
+    warn: 'yellow',
+    debug: 'blue',
+    error: 'red'
+});
 //Limpiamos la consola y mostramos un banner : md_links al ejecutar con node index.js
 // clear();
 
@@ -13,101 +23,184 @@ console.log(
         figlet.textSync('md-links', { horizontalLayout: 'full' })
     )
 );
-
 let fs = require('fs');
-
+//---------------------------PASO I: PARA TRAER LINKS---------------------------------
 //I.¿LA RUTA ES ABSOLUTA?
 const path = require('path');
 //Mi ruta absoluta
-const pathSlash1 = 'D:\\LABORATORIA\\md-link\\LIM013-fe-md-links\\index.js'
+const pathSlash1 = 'C:\\LABORATORIA\\md-link\\LIM013-fe-md-links\\README.md'
 const newPath1 = pathSlash1.replace(/\\\//g, ".")
+    // console.log(newPath1)
     //Mi ruta relativa
-const pathSlash2 = '..\\index.js'
+const pathSlash2 = '.\\README.md'
 const newPath2 = pathSlash2.replace(/\\\//g, ".")
+    // console.log(newPath2)
 
-//Condición:Generar un boleano si la ruta es absoluta
-//expr1:Retorna el path absoluto---más adelante preguntar si el archivo es .md
-//expr2:Convertir el path en absoluto 
+function isAbsolute(p) { return path.isAbsolute(p) ? p : path.resolve(p) }
+// const rutaabsoluta = isAbsolute(newPath1)
 
-
-function isAbsolute(p) { return path.isAbsolute(p) ? path.isAbsolute(p) : path.resolve(p) }
-console.log(isAbsolute(newPath1))
-console.log(isAbsolute(newPath1));
-// console.log(isAbsolute(newPath2));
 //II.¿El path es un archivo ?
-
-//Condición:Generar un boleano si la ruta es archivo o directorio
-//expr1:Retorna la ruta del archivo
-//expr2:Buscar Path
-// const isArchivo = (p) => {
-//         let stats = fs.statSync(p);
-//         if (stats.isFile(p)) {
-//             return stats.isFile(p);
-//         } else {
-//             stats.isDirectory(p)
-//             return false
-//         }
-//     }
-
 const isArchivo = (p) => {
     let stats = fs.statSync(p);
-    return stats.isFile(p) ? stats.isFile(p) : 'No es un archivo'
+    const result = stats.isFile()
+    return result
 }
 
-console.log(isArchivo(newPath1));
-console.log(isArchivo('README.md'));
-console.log(isArchivo('prueba'));
+// console.log(isArchivo('README.md'));
+// III.¿El path es un archivo MD. ?
+const isFileMd = (p) => {
+    return path.parse(p).ext === '.md'
+}
 
-//III.¿El path es un archivo MD. ?
+///IV. Recorrer el directorio
 
-//Condición:Generar un boleano si la ruta es archivo MD o no
-//expr1:Retorna el archivo 
-//expr2 :Retorna false
-// const isMd = (p) => {
-//     if (path.parse(p).ext === '.md') {
-//         return true;
-//     } else
-//         return false;
-// };
+const getLinklMD = (p) => {
+    let AllFiles = [];
+    const route = isAbsolute(p);
+    if (fs.statSync(route).isDirectory()) {
+        fs.readdirSync(route).forEach(file => {
+            const files = getLinklMD(path.join(route, file))
+            AllFiles = AllFiles.concat(files)
+        })
+    } else {
+        if (path.parse(route).ext === '.md') {
+            AllFiles.push(route);
+        }
+    }
+    return AllFiles
+}
 
-const isMd = (p) => {
-    return path.parse(p).ext === '.md' ? true : 'No es un archivo MD'
+// console.log(getLinklMD(newPath1));
+//-------------------------------PASO 2 : PARA EXTRAER LINKS------------------------------
+const extractlinks = (route) => {
+        const mdFiles = getLinklMD(route);
+        // console.log(mdFiles)
+        const ObjectMD = []
+        mdFiles.forEach(file => {
+            // console.log(file)
+            readmdFiles = fs.readFileSync(file, 'utf8')
+                // console.log(readmdFiles)
+            const regexMdLinks = /\[([^\[]+)\](\(.*\))/gm
+            const matches = readmdFiles.match(regexMdLinks)
+                // console.log('links', matches)
+            const singleMatch = /\[([^\[]+)\]\((.*)\)/
+            for (var i = 0; i < matches.length; i++) {
+                var md = singleMatch.exec(matches[i])
+                const href = `${md[2]}`
+                const text = `${md[1]}`
+                ObjectMD.push({
+                    href: href,
+                    text: text,
+                    file: file,
+                })
+            }
+        })
+        return ObjectMD
+    }
+    // console.log(extractlinks('prueba'))
+
+//------------------------PASO 3: FUNCIÓN VALIDATE----------------------------------------------------
+const fetch = require('node-fetch');
+//0.crear un nuevo objeto y añadir los nuevos status y statusmessager
+
+const validateLink = (route) => {
+        const promiseFetch = [];
+        const link = extractlinks(route);
+        //1.recorrer el array
+        link.forEach(element => {
+            //2.hacer petición fecth con la propiedad element.href por cada elemento del array
+            promiseFetch.push(fetch(element.href)
+                .then(function(response) {
+                    return {
+                        href: element.href,
+                        text: element.text,
+                        file: element.file,
+                        status: response.status,
+                        statusText: response.statusText,
+                    }
+                })
+                .catch(function() {
+                    return {
+                        href: element.href,
+                        text: element.text,
+                        file: element.file,
+                        status: 'error',
+                        statusText: 'FAIL',
+                    }
+                })
+            )
+        })
+        return Promise.all(promiseFetch);
+    }
+    // console.log(validateLink('prueba'))
+    // validateLink(newPath1)
+    //     .then(values => {
+    //         console.log(values);
+    //     });
+
+//-------------------------------------PASO 4:CASO --stats----------------------------------------------
+//Crear una función 
+//1.-Crear un función donde para stats cuyos parámetros son el arreglo de links 
+const statsLinks = (route) => {
+        //creo el objeto que contendrá la información de TOTAL y unique
+        const link = extractlinks(route);
+        const hreflink = link.map(link => {
+            return link.href
+        })
+        const total = hreflink.length;
+        // console.log(total);
+        const unique = new Set(hreflink)
+        const uniques = unique.size
+            // console.log(uniques)
+        return `Total: ${total} \nUnique: ${uniques}`;
+    }
+    // console.log(statsLinks(newPath1))
+    //función mdlinks que me devuleva la promesa
+const mdLinks = (route, option) => {
+    return new Promise((resolve, reject) => {
+        if (option === undefined) {
+            resolve(extractlinks(route));
+        } else {
+            reject('error')
+        }
+        if (option.validator === true) {
+            resolve(validateLink(route));
+        } else {
+            reject('error')
+        }
+    })
 };
 
-console.log(isMd('README.md'));
-console.log(isMd('colores.txt'));
+mdLinks('prueba')
+    .then((res) => {
+        // console.log(res)
+    })
+    .catch(console.error);
+//-------------------------------------PASO 5:CASO --stats --validate----------------------------------------------
 
-//IV.Leer el archivo
-try {
-    const data = fs.readFileSync('frutas.md', 'utf8')
-    console.log(data)
-} catch (err) {
-    console.error(err)
-}
+// const stateAndValidate = (options) => {
+//     if (options && options.validate) {
+//         const broken = links.filter(link =>
+//             link.status === 0 || link.status >= 400);
+//         broken = broken.map(link => link.href)
+//         return `Total: ${broken}`;
+//     }
+// }
 
-//V.Extraer link
-const MarkdownIt = require('markdown-it'),
-    md = new MarkdownIt();
-var result = md.render('frutas.md');
+// console.log(stateAndValidate(newPath1))
 
-function mdLinks() {
-    // fs.writeFileSync("frutas.md", "manzana,mandarina,pera");
-    // console.log('HOLA MUNDO');
 
-}
+
+
+
+
+
+
+
 
 module.exports = {
-    mdLinks
+    isAbsolute,
+    // isArchivo,
+    // isMd,
+    mdLinks,
 };
-
-
-
-
-//CREO UN SERVIDOR USANDO EL FRAMEWORK EXPRESS 
-// const express = require('express');
-// const colors = require('colors')
-// const server = express();
-
-// server.listen(3000, () => {
-//     console.log('server on port 3000'.green);
-// });
